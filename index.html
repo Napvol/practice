@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f4f0e8">
+<title>参考書レシピメーカー</title>
+<style>
+:root{--bg:#f5f2eb;--paper:#fffdf8;--ink:#292820;--muted:#777568;--line:#ded9cc;--accent:#536b59}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
+main{max-width:980px;margin:auto;padding:28px 18px 60px}.head{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:22px}
+h1{font-size:clamp(25px,5vw,38px);margin:0;letter-spacing:.03em}.sub{color:var(--muted);font-size:13px;margin-top:7px}.tag{font-size:11px;letter-spacing:.12em;border:1px solid var(--line);border-radius:99px;padding:7px 11px;white-space:nowrap}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:17px;margin:14px 0}
+label{font-size:13px;font-weight:650;display:block;margin-bottom:7px}input[type=text],select{width:100%;border:1px solid var(--line);border-radius:9px;padding:11px;background:white;color:var(--ink);font:inherit}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.book{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:9px;min-width:0;transition:.15s}
+.book.selected{outline:3px solid var(--accent);background:#edf1eb}.cover{aspect-ratio:3/4;background:#eeeae1;border-radius:7px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.cover img{width:100%;height:100%;object-fit:contain}.placeholder{font-size:12px;color:#888;text-align:center}
+.book input[type=text]{margin-top:9px;font-size:13px;padding:9px}
+.upload{display:block;text-align:center;font-size:12px;color:var(--muted);padding:9px 3px;cursor:pointer}.upload input{display:none}
+.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+button,.filebtn{border:1px solid var(--line);background:white;color:var(--ink);border-radius:9px;padding:11px 14px;font:600 13px system-ui;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:white}
+button:disabled{opacity:.45;cursor:not-allowed}
+.hint,.status{font-size:12px;color:var(--muted);line-height:1.65}.status{min-height:20px;margin-top:8px}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.preview{width:100%;max-width:520px;display:block;margin:12px auto;border:1px solid var(--line);border-radius:8px;background:white}
+#result{width:100%;max-width:520px;display:block;margin:12px auto;border:1px solid var(--line);border-radius:8px}
+footer{font-size:11px;color:var(--muted);text-align:center;margin-top:24px}
+@media(max-width:520px){main{padding:20px 12px 45px}.grid{gap:7px}.book{padding:6px}.book input[type=text]{font-size:11px;padding:7px}.upload{font-size:10px}.panel{padding:13px}.controls{grid-template-columns:1fr}.head{align-items:start}}
+</style>
+</head>
+<body>
+<main>
+<header class="head"><div><h1>参考書レシピ</h1><div class="sub">9冊を並べて、自分だけの参考書ルートを1枚に。</div></div><span class="tag">MY STUDY LIBRARY</span></header>
+<section class="panel">
+<label for="title">レシピのタイトル</label><input id="title" type="text" maxlength="50" value="My Study Recipe">
+<p class="hint">各枠に表紙画像をアップロードし、参考書名を入力してください。画像はこのブラウザ内で処理され、サーバーには送信されません。</p>
+</section>
+<section class="grid" id="grid" aria-label="参考書9冊">
+</section>
+<section class="panel">
+<strong style="font-size:14px">並べ替え</strong>
+<p class="hint">「入れ替え」を押してから、交換したい2つの枠を順番に選択してください。枠をドラッグして移動することもできます。</p>
+<div class="actions"><button id="swapMode">入れ替えモード OFF</button><button id="reset">すべてリセット</button></div>
+<div class="status" id="swapStatus" aria-live="polite"></div>
+</section>
+<section class="panel">
+<strong style="font-size:14px">デザイン設定</strong>
+<div class="controls" style="margin-top:13px">
+<div><label for="theme">背景デザイン</label><select id="theme"><option value="white">ホワイト</option><option value="cream" selected>クリーム</option><option value="dark">ダーク</option></select></div>
+<div><label for="fontSize">参考書名の文字サイズ</label><select id="fontSize"><option value="22">標準</option><option value="27" selected>大きめ</option><option value="32">特大</option></select></div>
+</div>
+<label style="display:flex;align-items:center;gap:8px;margin-top:15px"><input type="checkbox" id="numbers" checked> 番号を表示する</label>
+</section>
+<section class="panel">
+<strong style="font-size:14px">完成プレビュー</strong>
+<canvas id="canvas" class="preview" width="1200" height="1600"></canvas>
+<div class="actions"><button class="primary" id="make">完成画像を作成</button><button id="download">PNGを保存</button><button id="share">共有</button></div>
+<div class="status" id="status" aria-live="polite">画像を登録するとプレビューに反映されます。</div>
+<img id="result" alt="完成した参考書レシピ" hidden>
+<p class="hint">iPhoneで保存ボタンが動かない場合は「完成画像を作成」を押し、表示された画像を長押しして「写真に保存」を選んでください。</p>
+</section>
+<footer>参考書レシピメーカー · 無料・ログイン不要</footer>
+</main>
+<script>
+(()=>{
+const grid=document.getElementById('grid'),canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const items=Array.from({length:9},(_,i)=>({name:'',img:null,src:null}));
+let swap=false,first=null,dragIndex=null,lastBlob=null;
+const $=id=>document.getElementById(id);
+const themes={
+ white:{bg:'#ffffff',card:'#f4f4f2',ink:'#222222',muted:'#777777',line:'#dddddd'},
+ cream:{bg:'#f3eddf',card:'#e9dfcf',ink:'#352e26',muted:'#817464',line:'#d8cbb6'},
+ dark:{bg:'#202328',card:'#30343a',ink:'#f5f3ee',muted:'#b5b7ba',line:'#555960'}
+};
+function makeSlots(){
+ items.forEach((it,i)=>{
+  const el=document.createElement('article');el.className='book';el.draggable=true;el.dataset.index=i;
+  el.innerHTML=`<div class="cover"><span class="placeholder">BOOK ${String(i+1).padStart(2,'0')}<br>表紙画像</span></div>
+  <input type="text" maxlength="70" placeholder="参考書名" aria-label="${i+1}冊目の参考書名">
+  <label class="upload">＋ 表紙をアップロード<input type="file" accept="image/*"></label>
+  <button type="button" style="width:100%;padding:8px;font-size:11px">この枠を選択</button>`;
+  const name=el.querySelector('input[type=text]'),file=el.querySelector('input[type=file]');
+  name.value=it.name;name.addEventListener('input',()=>{it.name=name.value;draw()});
+  file.addEventListener('change',()=>{
+   const f=file.files[0];if(!f)return;
+   if(!f.type.startsWith('image/')||f.size>15*1024*1024){$('status').textContent='15MB以下の画像ファイルを選択してください。';file.value='';return}
+   const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{it.img=img;it.src=reader.result;renderSlots();draw();$('status').textContent=(i+1)+'冊目の表紙を登録しました。'};img.src=reader.result};reader.readAsDataURL(f);
+  });
+  el.querySelector('button').addEventListener('click',()=>selectSlot(i));
+  el.addEventListener('dragstart',e=>{dragIndex=i;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(i))});
+  el.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move'});
+  el.addEventListener('drop',e=>{e.preventDefault();const from=dragIndex;if(from===null||from===i)return;exchange(from,i);dragIndex=null});
+  el.addEventListener('dragend',()=>dragIndex=null);
+  grid.appendChild(el);
+ });
+}
+function renderSlots(){
+ [...grid.children].forEach((el,i)=>{
+  const it=items[i],cover=el.querySelector('.cover');cover.replaceChildren();
+  if(it.img){const img=document.createElement('img');img.src=it.src;cover.appendChild(img)}
+  else{const span=document.createElement('span');span.className='placeholder';span.textContent='BOOK '+String(i+1).padStart(2,'0')+'　表紙画像';cover.appendChild(span)}
+  el.querySelector('input[type=text]').value=it.name;
+  el.classList.toggle('selected',swap&&first===i);
+  el.querySelector('button').textContent=swap?(first===i?'選択中 ✓':'この枠を選択'):'この枠を選択';
+ });
+}
+function selectSlot(i){
+ if(!swap){$('swapStatus').textContent='先に入れ替えモードをONにしてください。';return}
+ if(first===null){first=i;$('swapStatus').textContent=(i+1)+'番を選択中。交換先を選んでください。'}
+ else if(first===i){first=null;$('swapStatus').textContent='選択を解除しました。'}
+ else{const a=first;exchange(a,i);first=null;$('swapStatus').textContent=(a+1)+'番と'+(i+1)+'番を交換しました。'}
+ renderSlots();
+}
+function exchange(a,b){[items[a],items[b]]=[items[b],items[a]];renderSlots();draw()}
+function draw(){
+ const p=themes[$('theme').value],font=Number($('fontSize').value);
+ ctx.fillStyle=p.bg;ctx.fillRect(0,0,1200,1600);
+ ctx.fillStyle=p.ink;ctx.textAlign='left';ctx.font='bold 48px sans-serif';ctx.fillText(($('title').value.trim()||'My Study Recipe').slice(0,30),64,92,1070);
+ ctx.fillStyle=p.muted;ctx.font='20px sans-serif';ctx.fillText('MY REFERENCE BOOK COLLECTION',66,132);
+ ctx.strokeStyle=p.line;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(64,160);ctx.lineTo(1136,160);ctx.stroke();
+ const left=64,top=195,gap=22,cw=(1072-2*gap)/3,ch=430;
+ items.forEach((it,i)=>{
+  const x=left+(i%3)*(cw+gap),y=top+Math.floor(i/3)*(ch+gap);
+  ctx.fillStyle=p.card;ctx.beginPath();ctx.roundRect(x,y,cw,ch,13);ctx.fill();
+  if($('numbers').checked){ctx.fillStyle=p.muted;ctx.font='bold 19px sans-serif';ctx.fillText(String(i+1).padStart(2,'0'),x+16,y+27)}
+  const ix=x+18,iy=y+45,iw=cw-36,ih=ch-122;
+  if(it.img){const s=Math.min(iw/it.img.width,ih/it.img.height),w=it.img.width*s,h=it.img.height*s;ctx.drawImage(it.img,ix+(iw-w)/2,iy+(ih-h)/2,w,h)}
+  else{ctx.fillStyle=p.bg;ctx.fillRect(ix,iy,iw,ih);ctx.fillStyle=p.muted;ctx.textAlign='center';ctx.font='24px sans-serif';ctx.fillText('BOOK '+String(i+1).padStart(2,'0'),ix+iw/2,iy+ih/2)}
+  ctx.fillStyle=p.ink;ctx.textAlign='center';ctx.font='bold '+font+'px sans-serif';
+  const text=it.name.trim()||'参考書名未入力',lines=[];let line='';
+  for(const c of text){if(ctx.measureText(line+c).width>iw-12&&line){lines.push(line);line=c}else line+=c}if(line)lines.push(line);
+  const shown=lines.slice(0,2),base=y+ch-54-(shown.length-1)*(font+5);
+  shown.forEach((l,j)=>ctx.fillText(l,x+cw/2,base+j*(font+5),iw-10));
+ });
+ ctx.fillStyle=p.muted;ctx.textAlign='center';ctx.font='18px sans-serif';ctx.fillText('MY STUDY RECIPE  ·  9 BOOKS',600,1550);
+}
+function blobFromCanvas(){return new Promise(resolve=>canvas.toBlob(resolve,'image/png'))}
+$('swapMode').addEventListener('click',()=>{swap=!swap;first=null;$('swapMode').textContent=swap?'入れ替えモード ON ✓':'入れ替えモード OFF';$('swapStatus').textContent=swap?'2つの枠を順番に選択するか、ドラッグして交換できます。':'';renderSlots()});
+$('reset').addEventListener('click',()=>{if(!confirm('入力した9冊をすべて消去しますか？'))return;items.forEach(x=>{x.name='';x.img=null;x.src=null});$('title').value='My Study Recipe';$('result').hidden=true;lastBlob=null;renderSlots();draw();$('status').textContent='リセットしました。'});
+['title','theme','fontSize','numbers'].forEach(id=>$(id).addEventListener('input',draw));
+$('make').addEventListener('click',async()=>{draw();lastBlob=await blobFromCanvas();if(!lastBlob){$('status').textContent='画像を作成できませんでした。';return}const url=URL.createObjectURL(lastBlob);$('result').src=url;$('result').hidden=false;$('status').textContent='完成画像を作成しました。長押しで保存できます。'});
+$('download').addEventListener('click',async()=>{draw();lastBlob=await blobFromCanvas();if(!lastBlob){$('status').textContent='画像を作成できませんでした。';return}const url=URL.createObjectURL(lastBlob),a=document.createElement('a');a.href=url;a.download='reference-recipe.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);$('result').src=URL.createObjectURL(lastBlob);$('result').hidden=false;$('status').textContent='保存処理を開始しました。保存できない場合は下の画像を長押ししてください。'});
+$('share').addEventListener('click',async()=>{draw();lastBlob=lastBlob||await blobFromCanvas();if(!lastBlob)return;const file=new File([lastBlob],'reference-recipe.png',{type:'image/png'});try{if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({files:[file],title:'参考書レシピ'});else{$('status').textContent='この環境では共有メニューを使えません。完成画像を作成して長押し保存してください。'}}catch(e){if(e.name!=='AbortError')$('status').textContent='共有を開始できませんでした。画像を長押しして保存してください。'}});
+makeSlots();renderSlots();draw();
+})();
+</script>
+</body>
+</html>
